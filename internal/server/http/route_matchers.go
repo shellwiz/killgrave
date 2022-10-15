@@ -2,8 +2,10 @@ package http
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/antonmedv/expr"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -18,6 +20,20 @@ import (
 func MatcherBySchema(imposter Imposter) mux.MatcherFunc {
 	return func(req *http.Request, rm *mux.RouteMatch) bool {
 		err := validateSchema(imposter, req)
+
+		// TODO: inject the logger
+		if err != nil {
+			log.Println(err)
+			return false
+		}
+		return true
+	}
+}
+
+// MatcherByExpr check if the request matching with expr
+func MatcherByExpr(imposter Imposter) mux.MatcherFunc {
+	return func(req *http.Request, rm *mux.RouteMatch) bool {
+		err := validateExpr(imposter, req)
 
 		// TODO: inject the logger
 		if err != nil {
@@ -80,4 +96,51 @@ func validateSchema(imposter Imposter, req *http.Request) error {
 	}
 
 	return nil
+}
+
+type Context struct {
+	Body interface{}
+}
+
+func validateExpr(imposter Imposter, req *http.Request) error {
+	if imposter.Request.Expr == nil {
+		return nil
+	}
+
+	var requestBodyBytes []byte
+
+	defer func() {
+		req.Body.Close()
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(requestBodyBytes))
+	}()
+
+	requestBodyBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return fmt.Errorf("%w: impossible read the request body", err)
+	}
+	var parsedBody interface{}
+
+	json.Unmarshal([]byte(requestBodyBytes), &parsedBody)
+
+	program, err := expr.Compile(*imposter.Request.Expr, expr.Env(Context{}))
+	if err != nil {
+		return err
+	}
+
+	env := Context{
+		Body: parsedBody,
+	}
+
+	resultI, err := expr.Run(program, env)
+	if err != nil {
+		return err
+	}
+
+	switch result := resultI.(type) {
+	case bool:
+		if result {
+			return nil
+		}
+	}
+	return errors.New("not matched")
 }

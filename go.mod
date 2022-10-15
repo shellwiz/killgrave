@@ -3,6 +3,7 @@ module github.com/friendsofgo/killgrave
 go 1.16
 
 require (
+	github.com/antonmedv/expr v1.9.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0

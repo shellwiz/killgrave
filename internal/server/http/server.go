@@ -167,7 +167,8 @@ func (s *Server) addImposterHandler(imposters []Imposter, imposterConfig Imposte
 		imposter.BasePath = filepath.Dir(imposterConfig.FilePath)
 		r := s.router.HandleFunc(imposter.Request.Endpoint, ImposterHandler(imposter)).
 			Methods(imposter.Request.Method).
-			MatcherFunc(MatcherBySchema(imposter))
+			MatcherFunc(MatcherBySchema(imposter)).
+			MatcherFunc(MatcherByExpr(imposter))
 
 		if imposter.Request.Headers != nil {
 			for k, v := range *imposter.Request.Headers {
